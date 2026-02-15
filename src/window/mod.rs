@@ -3,7 +3,7 @@ use std::cmp::{max, min};
 use niri_config::utils::MergeWith as _;
 use niri_config::window_rule::{Match, WindowRule};
 use niri_config::{
-    BackgroundEffect, BlockOutFrom, BorderRule, CornerRadius, FloatingPosition, PresetSize,
+    BackgroundEffect, BlockOutFrom, BorderRule, CornerRadius, FloatingPosition, OutputName, PresetSize,
     ResolvedPopupsRules, ShadowRule, TabIndicatorRule,
 };
 use niri_ipc::ColumnDisplay;
@@ -180,7 +180,12 @@ impl<'a> WindowRef<'a> {
 }
 
 impl ResolvedWindowRules {
-    pub fn compute(rules: &[WindowRule], window: WindowRef, is_at_startup: bool) -> Self {
+    pub fn compute(
+        rules: &[WindowRule],
+        window: WindowRef,
+        is_at_startup: bool,
+        output: Option<&OutputName>,
+    ) -> Self {
         let _span = tracy_client::span!("ResolvedWindowRules::compute");
 
         let mut resolved = ResolvedWindowRules::default();
@@ -202,7 +207,7 @@ impl ResolvedWindowRules {
                         }
                     }
 
-                    window_matches(window, role, m)
+                    window_matches(window, role, m, output)
                 };
 
                 if !(rule.matches.is_empty() || rule.matches.iter().any(matches)) {
@@ -383,7 +388,12 @@ impl ResolvedWindowRules {
     }
 }
 
-fn window_matches(window: WindowRef, role: &XdgToplevelSurfaceRoleAttributes, m: &Match) -> bool {
+fn window_matches(
+    window: WindowRef,
+    role: &XdgToplevelSurfaceRoleAttributes,
+    m: &Match,
+    output: Option<&OutputName>,
+) -> bool {
     // Must be ensured by the caller.
     let server_pending = role.server_pending.as_ref().unwrap();
 
@@ -441,6 +451,15 @@ fn window_matches(window: WindowRef, role: &XdgToplevelSurfaceRoleAttributes, m:
 
     if let Some(is_window_cast_target) = m.is_window_cast_target {
         if window.is_window_cast_target() != is_window_cast_target {
+            return false;
+        }
+    }
+
+    if let Some(on_output) = &m.on_output {
+        let Some(name) = output else {
+            return false;
+        };
+        if !name.matches(on_output) {
             return false;
         }
     }

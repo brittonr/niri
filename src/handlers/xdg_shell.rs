@@ -1037,6 +1037,7 @@ impl State {
             &config.window_rules,
             WindowRef::Unmapped(unmapped),
             self.niri.is_at_startup,
+            None,
         );
 
         let Unmapped { window, state, .. } = unmapped;
@@ -1373,6 +1374,7 @@ impl State {
                 window_rules,
                 WindowRef::Unmapped(unmapped),
                 self.niri.is_at_startup,
+                None,
             );
             if let InitialConfigureState::Configured { rules, .. } = &mut unmapped.state {
                 *rules = new_rules;
@@ -1382,7 +1384,7 @@ impl State {
             .layout
             .find_window_and_output_mut(toplevel.wl_surface())
         {
-            if mapped.recompute_window_rules(window_rules, self.niri.is_at_startup) {
+            if mapped.recompute_window_rules(window_rules, self.niri.is_at_startup, None) {
                 drop(config);
                 let output = output.cloned();
                 let window = mapped.window.clone();
