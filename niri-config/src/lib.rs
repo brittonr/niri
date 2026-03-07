@@ -1674,6 +1674,7 @@ mod tests {
             },
             overview: Overview {
                 zoom: 0.5,
+                workspace_gap: 0.1,
                 backdrop_color: Color {
                     r: 0.15,
                     g: 0.15,
