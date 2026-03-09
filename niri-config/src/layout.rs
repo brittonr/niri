@@ -18,6 +18,7 @@ pub struct Layout {
     pub default_column_width: Option<PresetSize>,
     pub preset_window_heights: Vec<PresetSize>,
     pub center_focused_column: CenterFocusedColumn,
+    pub focus_column_tile: FocusColumnTile,
     pub always_center_single_column: bool,
     pub empty_workspace_above_first: bool,
     pub default_column_display: ColumnDisplay,
@@ -41,6 +42,7 @@ impl Default for Layout {
             ],
             default_column_width: Some(PresetSize::Proportion(0.5)),
             center_focused_column: CenterFocusedColumn::Never,
+            focus_column_tile: FocusColumnTile::LastFocused,
             always_center_single_column: false,
             empty_workspace_above_first: false,
             default_column_display: ColumnDisplay::Normal,
@@ -75,6 +77,7 @@ impl MergeWith<LayoutPart> for Layout {
             preset_column_widths,
             preset_window_heights,
             center_focused_column,
+            focus_column_tile,
             default_column_display,
             struts,
             background_color,
@@ -114,6 +117,8 @@ pub struct LayoutPart {
     pub preset_window_heights: Option<Vec<PresetSize>>,
     #[knuffel(child, unwrap(argument))]
     pub center_focused_column: Option<CenterFocusedColumn>,
+    #[knuffel(child, unwrap(argument))]
+    pub focus_column_tile: Option<FocusColumnTile>,
     #[knuffel(child)]
     pub always_center_single_column: Option<Flag>,
     #[knuffel(child)]
@@ -168,6 +173,15 @@ pub enum CenterFocusedColumn {
     /// Focusing a column will center it if it doesn't fit on the screen together with the
     /// previously focused column.
     OnOverflow,
+}
+
+#[derive(knuffel::DecodeScalar, Debug, Default, PartialEq, Eq, Clone, Copy)]
+pub enum FocusColumnTile {
+    /// When switching columns, preserve each column's last focused tile.
+    #[default]
+    LastFocused,
+    /// When switching columns, focus the tile closest to the current tile's vertical position.
+    Spatial,
 }
 
 impl<S> knuffel::Decode<S> for DefaultPresetSize

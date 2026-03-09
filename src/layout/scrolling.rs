@@ -4,7 +4,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use niri_config::utils::MergeWith as _;
-use niri_config::{CenterFocusedColumn, PresetSize, Struts};
+use niri_config::{CenterFocusedColumn, FocusColumnTile, PresetSize, Struts};
 use niri_ipc::{ColumnDisplay, SizeChange, WindowLayout};
 use ordered_float::NotNan;
 use smithay::backend::renderer::gles::GlesRenderer;
@@ -1551,7 +1551,8 @@ impl<W: LayoutElement> ScrollingSpace<W> {
         if self.active_column_idx == 0 {
             return false;
         }
-        self.activate_column(self.active_column_idx - 1);
+
+        self.focus_column_with_tile_matching(self.active_column_idx - 1);
         true
     }
 
@@ -1560,8 +1561,25 @@ impl<W: LayoutElement> ScrollingSpace<W> {
             return false;
         }
 
-        self.activate_column(self.active_column_idx + 1);
+        self.focus_column_with_tile_matching(self.active_column_idx + 1);
         true
+    }
+
+    /// Activate a column, optionally spatially matching the tile closest to the
+    /// current active tile's vertical center based on the `focus-column-tile` config.
+    fn focus_column_with_tile_matching(&mut self, target_col_idx: usize) {
+        if self.options.layout.focus_column_tile == FocusColumnTile::Spatial
+            && !self.columns.is_empty()
+        {
+            let current_col = &self.columns[self.active_column_idx];
+            let current_y_center = current_col.tile_y_center(current_col.active_tile_idx);
+
+            let target_col = &self.columns[target_col_idx];
+            let best_tile_idx = target_col.tile_idx_closest_to_y_center(current_y_center);
+            self.columns[target_col_idx].activate_idx(best_tile_idx);
+        }
+
+        self.activate_column(target_col_idx);
     }
 
     pub fn focus_column_first(&mut self) {
@@ -5242,6 +5260,28 @@ impl<W: LayoutElement> Column<W> {
 
     fn tile_offset(&self, tile_idx: usize) -> Point<f64, Logical> {
         self.tile_offsets().nth(tile_idx).unwrap()
+    }
+
+    /// Returns the vertical center of the given tile.
+    fn tile_y_center(&self, tile_idx: usize) -> f64 {
+        let offset = self.tile_offset(tile_idx);
+        offset.y + self.data[tile_idx].size.h / 2.
+    }
+
+    /// Returns the index of the tile whose vertical center is closest to `target_y_center`.
+    fn tile_idx_closest_to_y_center(&self, target_y_center: f64) -> usize {
+        self.tile_offsets()
+            .zip(self.data.iter())
+            .enumerate()
+            .map(|(idx, (offset, data))| {
+                let center = offset.y + data.size.h / 2.;
+                (idx, (center - target_y_center).abs())
+            })
+            .min_by(|(_, dist_a), (_, dist_b)| {
+                dist_a.partial_cmp(dist_b).unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map(|(idx, _)| idx)
+            .unwrap_or(0)
     }
 
     fn tile_offsets_in_render_order(
