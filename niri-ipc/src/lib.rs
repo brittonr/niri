@@ -765,6 +765,14 @@ pub enum Action {
     },
     /// Expand the focused column to space not taken up by other fully visible columns.
     ExpandColumnToAvailableWidth {},
+    /// Set all columns on the workspace to equal width, fitting them to the display.
+    ///
+    /// If `grid` is true, also redistributes windows into an optimal grid layout.
+    FitWorkspaceColumns {
+        /// Redistribute windows into a grid (rows × columns) layout.
+        #[cfg_attr(feature = "clap", arg(long, default_value_t = false))]
+        grid: bool,
+    },
     /// Switch between keyboard layouts.
     SwitchLayout {
         /// Layout to switch to.
