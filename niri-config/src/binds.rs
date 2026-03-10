@@ -322,6 +322,7 @@ pub enum Action {
     MaximizeWindowToEdgesById(u64),
     SetColumnWidth(#[knuffel(argument, str)] SizeChange),
     ExpandColumnToAvailableWidth,
+    FitWorkspaceColumns(#[knuffel(property(name = "grid"), default)] bool),
     SwitchLayout(#[knuffel(argument, str)] LayoutSwitchTarget),
     ShowHotkeyOverlay,
     MoveWorkspaceToMonitorLeft,
@@ -625,6 +626,7 @@ impl From<niri_ipc::Action> for Action {
             }
             niri_ipc::Action::SetColumnWidth { change } => Self::SetColumnWidth(change),
             niri_ipc::Action::ExpandColumnToAvailableWidth {} => Self::ExpandColumnToAvailableWidth,
+            niri_ipc::Action::FitWorkspaceColumns { grid } => Self::FitWorkspaceColumns(grid),
             niri_ipc::Action::SwitchLayout { layout } => Self::SwitchLayout(layout),
             niri_ipc::Action::ShowHotkeyOverlay {} => Self::ShowHotkeyOverlay,
             niri_ipc::Action::MoveWorkspaceToMonitorLeft {} => Self::MoveWorkspaceToMonitorLeft,

@@ -2992,6 +2992,13 @@ impl<W: LayoutElement> Layout<W> {
         workspace.toggle_full_width();
     }
 
+    pub fn fit_workspace_columns(&mut self, grid: bool) {
+        let Some(workspace) = self.active_workspace_mut() else {
+            return;
+        };
+        workspace.fit_workspace_columns(grid);
+    }
+
     pub fn set_column_width(&mut self, change: SizeChange) {
         let Some(workspace) = self.active_workspace_mut() else {
             return;

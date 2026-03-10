@@ -1643,6 +1643,9 @@ impl State {
             Action::MaximizeColumn => {
                 self.niri.layout.toggle_full_width();
             }
+            Action::FitWorkspaceColumns(grid) => {
+                self.niri.layout.fit_workspace_columns(grid);
+            }
             Action::MaximizeWindowToEdges => {
                 let focus = self.niri.layout.focus().map(|m| m.window.clone());
                 if let Some(window) = focus {

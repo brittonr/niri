@@ -1190,6 +1190,13 @@ impl<W: LayoutElement> Workspace<W> {
         self.scrolling.toggle_full_width();
     }
 
+    pub fn fit_workspace_columns(&mut self, grid: bool) {
+        if self.floating_is_active.get() {
+            return;
+        }
+        self.scrolling.fit_workspace_columns(grid);
+    }
+
     pub fn set_column_width(&mut self, change: SizeChange) {
         if self.floating_is_active.get() {
             self.floating.set_window_width(None, change, true);

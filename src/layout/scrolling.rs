@@ -2838,6 +2838,149 @@ impl<W: LayoutElement> ScrollingSpace<W> {
         self.animate_view_offset_to_column(None, self.active_column_idx, None);
     }
 
+    pub fn fit_workspace_columns(&mut self, grid: bool) {
+        if grid {
+            self.fit_workspace_to_grid();
+        } else {
+            self.fit_workspace_equalize();
+        }
+    }
+
+    fn fit_workspace_equalize(&mut self) {
+        let col_count = self.columns.len();
+        if col_count <= 1 {
+            return;
+        }
+
+        let proportion = 1.0 / col_count as f64;
+
+        for (idx, col) in self.columns.iter_mut().enumerate() {
+            col.is_full_width = false;
+            col.is_pending_maximized = false;
+            col.preset_width_idx = None;
+            col.width = ColumnWidth::Proportion(proportion);
+            col.update_tile_sizes(true);
+
+            cancel_resize_for_column(&mut self.interactive_resize, col);
+
+            // Update cached column data width
+            self.data[idx].update(col);
+        }
+
+        // Scroll view to show the active column
+        self.animate_view_offset_to_column(None, self.active_column_idx, None);
+    }
+
+    fn fit_workspace_to_grid(&mut self) {
+        // Count total tiling windows across all columns
+        let total_windows: usize = self.columns.iter().map(|col| col.tiles.len()).sum();
+        if total_windows <= 1 {
+            return;
+        }
+
+        // If all windows are already one-per-column, just equalize
+        if self.columns.len() == total_windows {
+            self.fit_workspace_equalize();
+            return;
+        }
+
+        // Calculate grid dimensions
+        let num_cols = (total_windows as f64).sqrt().ceil() as usize;
+        let tiles_per_col = (total_windows + num_cols - 1) / num_cols; // ceil division
+        let proportion = 1.0 / num_cols as f64;
+
+        // Find which window is currently focused so we can restore focus
+        let focused_window_id = self.columns.get(self.active_column_idx)
+            .and_then(|col| col.tiles.get(col.active_tile_idx))
+            .map(|tile| tile.window().id().clone());
+
+        // Extract all tiles from all columns
+        // We need to drain columns carefully. Remove columns from back to front.
+        let mut all_tiles: Vec<Tile<W>> = Vec::with_capacity(total_windows);
+        while let Some(mut column) = self.columns.pop() {
+            // Drain tiles in reverse since we're popping columns from the back
+            while let Some(tile) = column.tiles.pop() {
+                all_tiles.push(tile);
+            }
+        }
+        all_tiles.reverse(); // Restore original left-to-right, top-to-bottom order
+        self.data.clear();
+        self.interactive_resize = None;
+        self.active_column_idx = 0;
+        self.activate_prev_column_on_removal = None;
+        self.view_offset_to_restore = None;
+
+        // Build new columns
+        let mut new_active_col = 0;
+        let mut new_active_tile = 0;
+        let mut tile_iter = all_tiles.into_iter().peekable();
+        let mut col_idx = 0;
+
+        while tile_iter.peek().is_some() {
+            // Take up to tiles_per_col tiles for this column
+            let first_tile = tile_iter.next().unwrap();
+
+            // Check if this was the focused window
+            if let Some(ref fid) = focused_window_id {
+                if first_tile.window().id() == fid {
+                    new_active_col = col_idx;
+                    new_active_tile = 0;
+                }
+            }
+
+            let mut column = Column::new_with_tile(
+                first_tile,
+                self.view_size,
+                self.working_area,
+                self.parent_area,
+                self.scale,
+                ColumnWidth::Proportion(proportion),
+                false, // is_full_width
+            );
+
+            // Add remaining tiles to this column
+            let mut tile_in_col = 1;
+            while tile_in_col < tiles_per_col {
+                if let Some(tile) = tile_iter.next() {
+                    if let Some(ref fid) = focused_window_id {
+                        if tile.window().id() == fid {
+                            new_active_col = col_idx;
+                            new_active_tile = tile_in_col;
+                        }
+                    }
+                    column.add_tile_at(column.tiles.len(), tile);
+                    tile_in_col += 1;
+                } else {
+                    break;
+                }
+            }
+
+            // Override width to our proportion (new_with_tile may have used rules)
+            column.width = ColumnWidth::Proportion(proportion);
+            column.preset_width_idx = None;
+            column.is_full_width = false;
+            column.is_pending_maximized = false;
+            column.update_tile_sizes(true);
+
+            self.data.push(ColumnData::new(&column));
+            self.columns.push(column);
+            col_idx += 1;
+        }
+
+        // Restore focus
+        if !self.columns.is_empty() {
+            self.active_column_idx = new_active_col.min(self.columns.len() - 1);
+            let col = &mut self.columns[self.active_column_idx];
+            col.active_tile_idx = new_active_tile.min(col.tiles.len() - 1);
+        }
+
+        // Reset view to show the active column
+        self.view_offset = ViewOffset::Static(0.);
+        self.view_offset = ViewOffset::Static(
+            self.compute_new_view_offset_for_column(None, self.active_column_idx, None),
+        );
+    }
+
     pub fn set_fullscreen(&mut self, window: &W::Id, is_fullscreen: bool) -> bool {
         let mut col_idx = self
             .columns
